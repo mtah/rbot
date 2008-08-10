@@ -1,0 +1,70 @@
+okay:
+  ok
+  okej
+  uppfattat!
+  visst
+  fixat
+  absolut!
+  allright
+  japp
+  förstått
+  det fixar jag
+dunno:
+  vet ej
+  ingen aning
+  ...öh?
+  *rycker på axlarna*
+  fråga inte mej
+  vem vet?
+  har jag aldrig hört talas om :(
+dunno_about_X:
+  jag vet ingenting om %s
+  har aldrig hört talas om %s :(
+  %s? vad är det?
+  men vad är %s?
+insult:
+  %s: ditt stolpskott!
+  %s: :(
+  %s: jag hatar dig :(
+  %s: dö!
+  %s: jag känner mig förolämpad!
+  %s: du sårar mina känslor
+hello:
+  hallå :)
+  tjenare :)
+  hejsan
+  hej!
+  respekt.
+  hej
+  läget?
+hello_X:
+  hallå %s :)
+  %s: hallå där
+  %s: tjenare :)
+  %s: hejsan
+  hej %s :)
+  %s: respekt
+  %s: hej!
+  %s: hur är läget?
+  läget %s?
+welcome:
+  inga problem
+  varsågod
+  lugna puckar
+  säg bara till
+  np :)
+thanks:
+  tack :)
+  underbart!
+  man tackar :)
+  =D
+  super!
+thanks_X:
+  %s: tack :)
+  %s: underbart!
+  %s: =D
+  %s: man tackar :)
+  %s: super!
+quit:
+  hej då!
+  vi ses!
