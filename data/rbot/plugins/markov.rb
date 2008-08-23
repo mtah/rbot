@@ -20,6 +20,10 @@ class MarkovPlugin < Plugin
   Config.register Config::ArrayValue.new('markov.ignore',
     :default => [],
     :desc => "Hostmasks and channel names markov should NOT learn from (e.g. idiot*!*@*, #privchan).")
+  Config.register Config::IntegerValue.new('markov.max_words',
+    :default => 50,
+    :validate => Proc.new { |v| (0..100).include? v },
+    :desc => "Maximum number of words the bot should put in a sentence")
 
   def initialize
     super
@@ -35,7 +39,7 @@ class MarkovPlugin < Plugin
     if @bot.config['markov.ignore_users']
       debug "moving markov.ignore_users to markov.ignore"
       @bot.config['markov.ignore'] = @bot.config['markov.ignore_users'].dup
-      @bot.config.delete('markov.ignore_users')
+      @bot.config.delete('markov.ignore_users'.to_sym)
     end
     @learning_queue = Queue.new
     @learning_thread = Thread.new do
@@ -55,7 +59,7 @@ class MarkovPlugin < Plugin
   end
 
   def generate_string(word1, word2)
-    # limit to max of 50 words
+    # limit to max of markov.max_words words
     output = word1 + " " + word2
 
     # try to avoid :nonword in the first iteration
@@ -67,7 +71,7 @@ class MarkovPlugin < Plugin
       word1, word2 = word2, word3
     end
 
-    49.times do
+    (@bot.config['markov.max_words'] - 1).times do
       wordlist = @registry["#{word1} #{word2}"]
       break if wordlist.empty?
       word3 = wordlist[rand(wordlist.length)]
@@ -179,9 +183,11 @@ class MarkovPlugin < Plugin
     return unless word1 and word2
     line = generate_string(word1, word2)
     return unless line
-    return if line == message
+    # we do nothing if the line we return is just an initial substring
+    # of the line we received
+    return if message.index(line) == 0
     @bot.timer.add_once(delay) {
-      m.reply line
+      m.plainreply line
     }
   end
 

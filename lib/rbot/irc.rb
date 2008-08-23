@@ -922,7 +922,7 @@ module Irc
   class User < Netmask
     alias :to_s :nick
 
-    attr_accessor :real_name
+    attr_accessor :real_name, :idle_since, :signon
 
     # Create a new IRC User from a given Netmask (or anything that can be converted
     # into a Netmask) provided that the given Netmask does not have globs.
@@ -934,6 +934,8 @@ module Irc
       raise ArgumentError, "#{str.inspect} must not have globs (unescaped * or ?)" if host.has_irc_glob? && host != "*"
       @away = false
       @real_name = String.new
+      @idle_since = nil
+      @signon = nil
     end
 
     # The nick of a User may be changed freely, but it must not contain glob patterns.
@@ -1299,12 +1301,15 @@ module Irc
     include ServerOrCasemap
     attr_reader :name, :topic, :mode, :users
     alias :to_s :name
+    attr_accessor :creation_time, :url
 
     def inspect
       str = self.__to_s__[0..-2]
       str << " on server #{server}" if server
       str << " @name=#{@name.inspect} @topic=#{@topic.text.inspect}"
       str << " @users=[#{user_nicks.sort.join(', ')}]"
+      str << " (created on #{creation_time})" if creation_time
+      str << " (URL #{url})" if url
       str << ">"
     end
 
@@ -1368,6 +1373,12 @@ module Irc
 
       # Flags
       @mode = ModeHash.new
+
+      # creation time, only on some networks
+      @creation_time = nil
+
+      # URL, only on some networks
+      @url = nil
     end
 
     # Removes a user from the channel

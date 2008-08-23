@@ -277,14 +277,6 @@ class Bot
     Config.register Config::IntegerValue.new('server.reconnect_wait',
       :default => 5, :validate => Proc.new{|v| v >= 0},
       :desc => "Seconds to wait before attempting to reconnect, on disconnect")
-    Config.register Config::FloatValue.new('server.sendq_delay',
-      :default => 2.0, :validate => Proc.new{|v| v >= 0},
-      :desc => "(flood prevention) the delay between sending messages to the server (in seconds)",
-      :on_change => Proc.new {|bot, v| bot.socket.sendq_delay = v })
-    Config.register Config::IntegerValue.new('server.sendq_burst',
-      :default => 4, :validate => Proc.new{|v| v >= 0},
-      :desc => "(flood prevention) max lines to burst to the server before throttling. Most ircd's allow bursts of up 5 lines",
-      :on_change => Proc.new {|bot, v| bot.socket.sendq_burst = v })
     Config.register Config::IntegerValue.new('server.ping_timeout',
       :default => 30, :validate => Proc.new{|v| v >= 0},
       :desc => "reconnect if server doesn't respond to PING within this many seconds (set to 0 to disable)")
@@ -589,7 +581,7 @@ class Bot
         debug "server.list is now #{@config['server.list'].inspect}"
     end
 
-    @socket = Irc::Socket.new(@config['server.list'], @config['server.bindhost'], @config['server.sendq_delay'], @config['server.sendq_burst'], :ssl => @config['server.ssl'])
+    @socket = Irc::Socket.new(@config['server.list'], @config['server.bindhost'], :ssl => @config['server.ssl'])
     @client = Client.new
 
     @plugins.scan
@@ -609,15 +601,6 @@ class Bot
 
       @plugins.delegate("welcome", m)
       @plugins.delegate("connect")
-
-      @config['irc.join_channels'].each { |c|
-        debug "autojoining channel #{c}"
-        if(c =~ /^(\S+)\s+(\S+)$/i)
-          join $1, $2
-        else
-          join c if(c)
-        end
-      }
     }
 
     # TODO the next two @client should go into rfc2812.rb, probably
@@ -706,6 +689,12 @@ class Bot
       m = ModeChangeMessage.new(self, server, data[:source], data[:target], data[:modestring])
       m.modes = data[:modes]
       @plugins.delegate "modechange", m
+    }
+    @client[:whois] = proc {|data|
+      source = data[:source]
+      target = server.get_user(data[:whois][:nick])
+      m = WhoisMessage.new(self, server, source, target, data[:whois])
+      @plugins.delegate "whois", m
     }
     @client[:join] = proc {|data|
       m = JoinMessage.new(self, server, data[:source], data[:channel], data[:message])
@@ -1216,6 +1205,11 @@ class Bot
   # changing mode
   def mode(channel, mode, target=nil)
     sendq "MODE #{channel} #{mode} #{target}", channel, 2
+  end
+
+  # asking whois
+  def whois(nick, target=nil)
+    sendq "WHOIS #{target} #{nick}", nil, 0
   end
 
   # kicking a user

@@ -195,9 +195,7 @@ module Irc
       @plainmessage = BasicUserMessage.strip_formatting(@message)
       @message = BasicUserMessage.strip_initial_formatting(@message)
 
-      if target && target == @bot.myself
-        @address = true
-      end
+      @address = true if source == @bot.myself
 
     end
 
@@ -323,9 +321,8 @@ module Irc
       @ctcp = false
       @action = false
 
-      if target == @bot.myself
+      if @address = (target == @bot.myself)
         @private = true
-        @address = true
         @channel = nil
         @replyto = source
       else
@@ -357,6 +354,8 @@ module Irc
         @action = @ctcp == 'ACTION'
         debug "Received CTCP command #{@ctcp} with options #{@message} (action? #{@action})"
         @logmessage = @message.dup
+        @plainmessage = BasicUserMessage.strip_formatting(@message)
+        @message = BasicUserMessage.strip_initial_formatting(@message)
       end
 
       # free splitting for plugins
@@ -541,12 +540,25 @@ module Irc
     attr_accessor :modes
     def initialize(bot, server, source, target, message="")
       super(bot, server, source, target, message)
-      @address = (source == @bot.myself)
       @modes = []
     end
 
     def inspect
       fields = ' modes=' << modes.inspect
+      super(fields)
+    end
+  end
+
+  # class to manage WHOIS replies
+  class WhoisMessage < BasicUserMessage
+    attr_reader :whois
+    def initialize(bot, server, source, target, whois)
+      super(bot, server, source, target, "")
+      @whois = whois
+    end
+
+    def inspect
+      fields = ' whois=' << whois.inspect
       super(fields)
     end
   end
@@ -612,7 +624,6 @@ module Irc
       super(bot, server, source, channel, message)
       @channel = channel
       # in this case sourcenick is the nick that could be the bot
-      @address = (source == @bot.myself)
     end
   end
 

@@ -144,6 +144,12 @@ module Irc
   # "<channel> <mode> <mode params>"
   RPL_CHANNELMODEIS=324
 
+  # "<channel> <unixtime>"
+  RPL_CREATIONTIME=329
+
+  # "<channel> <url>"
+  RPL_CHANNEL_URL=328
+
   # "<channel> :No topic is set"
   RPL_NOTOPIC=331
 
@@ -975,7 +981,6 @@ module Irc
     #
     # ==server events currently supported:
     #
-    # TODO handle errors ERR_NOSUCHNICK, ERR_NOSUCHCHANNEL
     # TODO handle errors ERR_CHANOPRIVSNEEDED, ERR_CANNOTSENDTOCHAN
     #
     # welcome::     server welcome message on connect
@@ -1147,13 +1152,7 @@ module Irc
           # - "@" is used for secret channels, "*" for private
           # channels, and "=" for others (public channels).
           data[:channeltype] = argv[1]
-          data[:channel] = argv[2]
-
-          chan = @server.get_channel(data[:channel])
-          unless chan
-            warning "Received names #{data[:topic].inspect} for channel #{data[:channel].inspect} I was not on"
-            return
-          end
+          data[:channel] = chan = @server.channel(argv[2])
 
           users = []
           argv[3].scan(/\S+/).each { |u|
@@ -1177,7 +1176,7 @@ module Irc
           }
           @tmpusers += users
         when RPL_ENDOFNAMES
-          data[:channel] = argv[1]
+          data[:channel] = @server.channel(argv[1])
           data[:users] = @tmpusers
           handle(:names, data)
           @tmpusers = Array.new
@@ -1238,12 +1237,17 @@ module Irc
         when RPL_DATASTR
           data[:text] = argv[1]
           handle(:datastr, data)
+        when RPL_AWAY
+          data[:nick] = user = @server.user(argv[1])
+          data[:message] = argv[-1]
+          user.away = data[:message]
+          handle(:away, data)
 	when RPL_WHOREPLY
-          data[:channel] = argv[1]
+          data[:channel] = channel = @server.channel(argv[1])
           data[:user] = argv[2]
           data[:host] = argv[3]
           data[:userserver] = argv[4]
-          data[:nick] = argv[5]
+          data[:nick] = user = @server.user(argv[5])
           if argv[6] =~ /^(H|G)(\*)?(.*)?$/
             data[:away] = ($1 == 'G')
             data[:ircop] = $2
@@ -1256,8 +1260,6 @@ module Irc
           end
           data[:hopcount], data[:real_name] = argv[7].split(" ", 2)
 
-          user = @server.get_user(data[:nick])
-
           user.user = data[:user]
           user.host = data[:host]
           user.away = data[:away] # FIXME doesn't provide the actual message
@@ -1265,8 +1267,6 @@ module Irc
           # TODO userserver
           # TODO hopcount
           user.real_name = data[:real_name]
-
-          channel = @server.get_channel(data[:channel])
 
           channel.add_user(user, :silent=>true)
           data[:modes].map { |mode|
@@ -1276,9 +1276,85 @@ module Irc
           handle(:who, data)
         when RPL_ENDOFWHO
           handle(:eowho, data)
+        when RPL_WHOISUSER
+          @whois ||= Hash.new
+          @whois[:nick] = argv[1]
+          @whois[:user] = argv[2]
+          @whois[:host] = argv[3]
+          @whois[:real_name] = argv[-1]
+
+          user = @server.user(@whois[:nick])
+          user.user = @whois[:user]
+          user.host = @whois[:host]
+          user.real_name = @whois[:real_name]
+        when RPL_WHOISSERVER
+          @whois ||= Hash.new
+          @whois[:nick] = argv[1]
+          @whois[:server] = argv[2]
+          @whois[:server_info] = argv[-1]
+          # TODO update user info
+        when RPL_WHOISOPERATOR
+          @whois ||= Hash.new
+          @whois[:nick] = argv[1]
+          @whois[:operator] = argv[-1]
+          # TODO update user info
+        when RPL_WHOISIDLE
+          @whois ||= Hash.new
+          @whois[:nick] = argv[1]
+          user = @server.user(@whois[:nick])
+          @whois[:idle] = argv[2].to_i
+          user.idle_since = Time.now - @whois[:idle]
+          if argv[-1] == 'seconds idle, signon time'
+            @whois[:signon] = Time.at(argv[3].to_i)
+            user.signon = @whois[:signon]
+          end
+        when RPL_ENDOFWHOIS
+          @whois ||= Hash.new
+          @whois[:nick] = argv[1]
+          data[:whois] = @whois.dup
+          @whois.clear
+          handle(:whois, data)
+        when RPL_WHOISCHANNELS
+          @whois ||= Hash.new
+          @whois[:nick] = argv[1]
+          @whois[:channels] = []
+          user = @server.user(@whois[:nick])
+          argv[-1].split.each do |prechan|
+            pfx = prechan.scan(/[#{@server.supports[:prefix][:prefixes].join}]/)
+            modes = pfx.map { |p| @server.mode_for_prefix p }
+            chan = prechan[pfx.length..prechan.length]
+
+            channel = @server.channel(chan)
+            channel.add_user(user, :silent => true)
+            modes.map { |mode| channel.mode[mode].set(user) }
+
+            @whois[:channels] << [chan, modes]
+          end
         when RPL_CHANNELMODEIS
           parse_mode(serverstring, argv[1..-1], data)
           handle(:mode, data)
+        when RPL_CREATIONTIME
+          data[:channel] = @server.channel(argv[1])
+          data[:time] = Time.at(argv[2].to_i)
+          data[:channel].creation_time=data[:time]
+          handle(:creationtime, data)
+        when RPL_CHANNEL_URL
+          data[:channel] = @server.channel(argv[1])
+          data[:url] = argv[2]
+          data[:channel].url=data[:url].dup
+          handle(:channel_url, data)
+        when ERR_NOSUCHNICK
+          data[:nick] = argv[1]
+          if user = @server.get_user(data[:nick])
+            @server.delete_user(user)
+          end
+          handle(:nosuchnick, data)
+        when ERR_NOSUCHCHANNEL
+          data[:channel] = argv[1]
+          if channel = @server.get_channel(data[:channel])
+            @server.delete_channel(channel)
+          end
+          handle(:nosuchchannel, data)
         else
           warning "Unknown message #{serverstring.inspect}"
           handle(:unknown, data)
