@@ -1,10 +1,10 @@
-class AutoOP < Plugin
-  Config.register Config::BooleanValue.new('autoop.on_nick',
+class  < Plugin
+  Config.register Config::BooleanValue.new('.on_nick',
     :default => true,
     :desc => "Determines if the bot should auto-op when someone changes nick and the new nick matches a listed netmask")
 
   def help(plugin, topic="")
-    return "perform autoop based on hostmask - usage: add <hostmask> [channel channel ...], rm <hostmask> [channel], list - list current ops. If you don't specify which channels, all channels are assumed"
+    return "perform  based on hostmask - usage: add <hostmask> [channel channel ...], rm <hostmask> [channel], list - list current ops. If you don't specify which channels, all channels are assumed"
   end
 
   def join(m)
@@ -20,7 +20,7 @@ class AutoOP < Plugin
 
   def nick(m)
     return if m.address?
-    return unless @bot.config['autoop.on_nick']
+    return unless @bot.config['.on_nick']
     is_on = m.server.channels.inject(ChannelList.new) { |list, ch|
       list << ch if ch.users.include?(m.source)
       list
@@ -74,6 +74,23 @@ class AutoOP < Plugin
     end
     m.okay
   end
+  
+  def clear(m, params)
+  	#if (!params[:channels].empty?)
+  	#	params[:channels].each do |channel|
+  	#		@registry.each_key do |mask|
+  	#			if (@registry[mask] != nil)
+	# 				m.reply @registry[mask].inspect
+	#  				@registry[mask] = @registry[mask].reject {|elem| elem =~ /^#{channel}$/i}
+  	#			end
+  	#		end
+  	#		
+  	#	end
+  	#else
+  		@registry.clear
+  	#end
+  	m.okay
+  end
 
   def list(m, params)
     debug @registry.length
@@ -87,10 +104,11 @@ class AutoOP < Plugin
   end
 end
 
-plugin = AutoOP.new
+plugin = .new
 
-plugin.map 'autoop list', :action => 'list'
-plugin.map 'autoop add :mask [*channels]', :action => 'add'
-plugin.map 'autoop rm :mask [*channels]', :action => 'rm'
+plugin.map ' list', :action => 'list'
+plugin.map ' add :mask [*channels]', :action => 'add'
+plugin.map ' rm :mask [*channels]', :action => 'rm'
+plugin.map ' clear [*channels]', :action => 'clear'
 
 plugin.default_auth('*',false)
