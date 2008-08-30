@@ -38,7 +38,7 @@ class EmailPlugin < Plugin
         @announcements = {}				# all announced accounts
                                         # structure: {'account_name' => ['#channel1', '#channel2']}
         
-        @announcement_limit = 5			# announcement limit - don't announce any more mail at
+        @announcement_limit = 0			# announcement limit - don't announce any more mail at
                                         # the same time than this
                                         # NOT IMPLEMENTED
                                         
@@ -52,11 +52,17 @@ class EmailPlugin < Plugin
 	            
         		@is_announcing = true
         		
+     
         		@announcements.each do |account_name, targets|
-	            	targets.each {|target| @bot.say(target, "Announcing mail from #{account_name}")}
-	                fetch_mail(account_name) do |subject,from|
-	                    targets.each {|target| @bot.say(target, "MAIL: '#{subject}' from #{from}")}
-	                end	
+	            	
+        			begin 
+		                fetch_mail(account_name, @announcement_limit) do |subject,from|
+		                    targets.each {|target| @bot.say(target, "MAIL: '#{subject}' from #{from}")}
+		                end
+		                
+		            rescue AnnouncementLimitReached => report 
+		            	targets.each {|target| @bot.say(target, "There were #{report.mailcount} new mails in #{account_name} (announcement limit reached). Use 'email check #{account_name}' to see them all.")}
+		            end	
 	            end
 	        
 	            @is_announcing = false
@@ -193,7 +199,7 @@ class EmailPlugin < Plugin
         
     end
     
-    def fetch_mail(account_name)
+    def fetch_mail(account_name, limit = 0)
         mails = []
         acc = @accounts[account_name]
         
@@ -201,6 +207,10 @@ class EmailPlugin < Plugin
         
             # get all mails not yet fetched and process them
             pop.mails.reject {|m| mail_fetched?(m)}.each do |mail|
+            	if limit > 0 && mails.size >= limit
+            		raise AnnouncementLimitReached.new(pop.mails.size) 
+            	end
+            	 
                 header = mail.header
                 subject = rfc2047_decode_to('utf-8', header.scan(/Subject: ([^\r\n]+)/).to_s)
                 from = rfc2047_decode_to('utf-8', header.scan(/From: ([^\r\n]+)/).to_s)
@@ -260,6 +270,14 @@ class EmailPlugin < Plugin
           end
         end
     end
+end
+
+class AnnouncementLimitReached < RuntimeError
+	attr :mailcount
+	
+	def initialize(mailcount)
+		@mailcount = mailcount
+	end
 end
 
 plugin = EmailPlugin.new
