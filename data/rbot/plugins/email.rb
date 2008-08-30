@@ -20,6 +20,21 @@ require 'iconv'
 WORD = %r{=\?([!#$\%&'*+-/0-9A-Z\\^\`a-z{|}~]+)\?([BbQq])\?([!->@-~]+)\?=}
 
 class EmailPlugin < Plugin
+	
+	Config.register Config::IntegerValue.new('email.announcement_interval', 
+	:default => 300, :validate => Proc.new { |v| v > 0 },
+	:on_change => Proc.new { |bot, interval| 
+		bot.timer.reschedule(EmailPlugin.announcer, interval) unless EmailPlugin.announcer.nil?
+	},
+	:desc => "The time between two announcement rounds (in seconds).")
+	
+	Config.register Config::IntegerValue.new('email.announcement_limit',
+    :default => 5, :validate => Proc.new { |v| v > 0 },
+    :desc => "Maximum number of mails announced by the plugin at one point.")
+    
+    def self.announcer
+    	@@announcer
+    end
     
     def initialize
         super
@@ -38,30 +53,24 @@ class EmailPlugin < Plugin
         @announcements = {}				# all announced accounts
                                         # structure: {'account_name' => ['#channel1', '#channel2']}
         
-        @announcement_limit = 0			# announcement limit - don't announce any more mail at
-                                        # the same time than this
-                                        # NOT IMPLEMENTED
-                                        
-        @announcement_interval = 60		# time between annonuncements
-        
         @is_announcing = false			# boolean
         
         # add announcement action to timer
-        @bot.timer.add(@announcement_interval) {
+        @@announcer = @bot.timer.add(@bot.config['email.announcement_interval']) {
         	unless @is_announcing	# do not start another announcement if bot already is announcing
 	            
         		@is_announcing = true
         		
      
         		@announcements.each do |account_name, targets|
-	            	
         			begin 
-		                fetch_mail(account_name, @announcement_limit) do |subject,from|
+        				
+		                fetch_mail(account_name, @bot.config['email.announcement_limit']) do |subject,from|
 		                    targets.each {|target| @bot.say(target, "MAIL: '#{subject}' from #{from}")}
 		                end
 		                
 		            rescue AnnouncementLimitReached => report 
-		            	targets.each {|target| @bot.say(target, "There were #{report.mailcount} new mails in #{account_name} (announcement limit reached). Use 'email check #{account_name}' to see them all.")}
+		            	targets.each {|target| @bot.say(target, "There are #{report.unfetched_mails} new message(s) left in #{account_name} (announcement limit reached). Use 'email check #{account_name}' to see them all.")}
 		            end	
 	            end
 	        
@@ -84,7 +93,7 @@ class EmailPlugin < Plugin
             
             m.reply("Account #{params[:account_name]} added.")
         else
-            m.reply("Account #{params[:account_name]} already exists. Please delete it first or use account set #{params[:account_name]} <parameter> <value>.")
+            m.reply("Account #{params[:account_name]} already exists. Please delete it first or use 'account set #{params[:account_name]} <parameter> <value>' to modify it.")
             
         end
     end
@@ -205,10 +214,12 @@ class EmailPlugin < Plugin
         
         Net::POP3.start(acc[:server], acc[:port], acc[:username], acc[:password]) do |pop|
         
+        	mails_to_fetch = pop.mails.reject {|m| mail_fetched?(m)}
+        	
             # get all mails not yet fetched and process them
-            pop.mails.reject {|m| mail_fetched?(m)}.each do |mail|
+            mails_to_fetch.each do |mail|
             	if limit > 0 && mails.size >= limit
-            		raise AnnouncementLimitReached.new(pop.mails.size) 
+            		raise AnnouncementLimitReached.new(mails_to_fetch.size - mails.size) 
             	end
             	 
                 header = mail.header
@@ -273,10 +284,10 @@ class EmailPlugin < Plugin
 end
 
 class AnnouncementLimitReached < RuntimeError
-	attr :mailcount
+	attr :unfetched_mails
 	
-	def initialize(mailcount)
-		@mailcount = mailcount
+	def initialize(unfetched_mails)
+		@unfetched_mails = unfetched_mails
 	end
 end
 
