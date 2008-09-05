@@ -38,10 +38,10 @@ class EmailPlugin < Plugin
     
     def initialize
         super
-        @fetched_mails = []				# keeps track of the unique ids of all fetched mails
+        @fetched_mails = []				 # keeps track of the unique ids of all fetched mails
                                         # to avoid re-fetching mails
                                         
-        @accounts = {}					# all registered accounts
+        @accounts = {}					    # all registered accounts
                                         # structure: {'account_name' => {
                                         # 					:username,
                                         # 					:password,
@@ -50,7 +50,7 @@ class EmailPlugin < Plugin
                                         # 			 	}
                                         #			 }
                                         
-        @announcements = {}				# all announced accounts
+        @announcements = {}				 # all announced accounts
                                         # structure: {'account_name' => ['#channel1', '#channel2']}
         
         @is_announcing = false			# boolean
@@ -102,6 +102,9 @@ class EmailPlugin < Plugin
     def delete_account(m, params)
         if @accounts.has_key?(params[:account_name])
             @accounts.delete(params[:account_name])
+
+            #also, delete all associated announcements
+            @announcements.delete(params[:account_name])
             
             m.reply("Account #{params[:account_name]} deleted.")
         else
