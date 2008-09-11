@@ -38,22 +38,18 @@ class EmailPlugin < Plugin
     
     def initialize
         super
-        @fetched_mails = []				# keeps track of the unique ids of all fetched mails
-                                        # to avoid re-fetching mails
-                                        
-        @accounts = {}					# all registered accounts
-                                        # structure: {'account_name' => {
-                                        # 					:username,
-                                        # 					:password,
-                                        # 					:host,	
-                                        # 					:port,					
-                                        # 			 	}
-                                        #			 }
-                                        
-        @announcements = {}				# all announced accounts
-                                        # structure: {'account_name' => ['#channel1', '#channel2']}
         
-        @is_announcing = false			# boolean
+        # keeps track of the unique ids of all fetched mails to avoid re-fetching mails
+        @fetched_mails = @registry.has_key?(:fetched_mails) ? @registry[:fetched_mails] : []
+
+        # all registered accounts
+        @accounts = @registry.has_key?(:accounts) ? @registry[:accounts] : {}
+   		
+        # all announced accounts
+        @announcements = @registry.has_key?(:announcements) ? @registry[:announcements] : {}
+        
+        # is current ly announcing?
+        @is_announcing = false
         
         # add announcement action to timer
         @@announcer = @bot.timer.add(@bot.config['email.announcement_interval']) {
@@ -156,7 +152,7 @@ class EmailPlugin < Plugin
         m.reply("Now announcing #{params[:account_name]} to #{targets_commalist}.")
     end
     
-    # deletes entries from the @annonuncements hash
+    # deletes entries from the @announcements hash
     def delete_announcements(m, params)
         if @announcements.has_key?(params[:account_name])
         	
@@ -180,7 +176,7 @@ class EmailPlugin < Plugin
         end
     end
     
-    # lists the @annonuncements hash
+    # lists the @announcements hash
     def list_announcements(m, params)
         
         if @announcements.size > 0
@@ -243,6 +239,22 @@ class EmailPlugin < Plugin
         @fetched_mails.include?(mail.unique_id)
     end
     
+    def save
+    	@registry[:fetched_mails] = @fetched_mails unless @fetched_mails.nil?
+    	@registry[:accounts] = @accounts.dup unless @accounts.nil?
+    	
+    	# remove singleton methods by using dup, making the objects dumpable
+    	unless @announcements.nil?
+    		announcements = {}
+    		
+    		@announcements.each do |account_name,targets|
+    			announcements[account_name] = targets.dup
+    		end
+    		
+    		@registry[:announcements] = announcements
+    	end
+    end
+    
     # Decodes a string, +from+, containing RFC 2047 encoded words into a target
     # character set, +target+. See iconv_open(3) for information on the
     # supported target encodings. If one of the encoded words cannot be
@@ -301,3 +313,5 @@ plugin.map 'email announce :account_name *targets', :action => 'add_announcement
 plugin.map 'email denounce :account_name [*targets]', :action => 'delete_announcements'
 plugin.map 'email announcements', :action => 'list_announcements'
 plugin.map 'email check :account_name', :action => 'check_mail'
+plugin.map 'registry write :key :value', :action => 'write_registry'
+plugin.map 'registry read :key', :action => 'read_registry'
