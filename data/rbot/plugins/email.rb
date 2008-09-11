@@ -98,6 +98,9 @@ class EmailPlugin < Plugin
     def delete_account(m, params)
         if @accounts.has_key?(params[:account_name])
             @accounts.delete(params[:account_name])
+
+            #also, delete all associated announcements
+            @announcements.delete(params[:account_name])
             
             m.reply("Account #{params[:account_name]} deleted.")
         else
@@ -313,5 +316,3 @@ plugin.map 'email announce :account_name *targets', :action => 'add_announcement
 plugin.map 'email denounce :account_name [*targets]', :action => 'delete_announcements'
 plugin.map 'email announcements', :action => 'list_announcements'
 plugin.map 'email check :account_name', :action => 'check_mail'
-plugin.map 'registry write :key :value', :action => 'write_registry'
-plugin.map 'registry read :key', :action => 'read_registry'
