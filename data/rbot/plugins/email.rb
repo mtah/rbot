@@ -19,6 +19,9 @@ require 'iconv'
 # Regular expression for matching RFC2047 encoded strings
 WORD = %r{=\?([!#$\%&'*+-/0-9A-Z\\^\`a-z{|}~]+)\?([BbQq])\?([!->@-~]+)\?=}
 
+# Default port used for POP3 connections (if not specified)
+DEFAULT_PORT_POP3 = 110
+
 class EmailPlugin < Plugin
 	
 	Config.register Config::IntegerValue.new('email.announcement_interval', 
@@ -74,6 +77,31 @@ class EmailPlugin < Plugin
             end
 	        
         }
+    end
+    
+    def help(plugin, topic="")
+    	case topic
+    	when "add"
+    		"email add <account name> <username> <password> <server> [<port>] => adds a new account. If <port> is not specified, the default port will be used (POP3: #{DEFAULT_PORT_POP3})."
+    	when "delete"
+    		"email delete <account name> => deletes an account."
+    	when "list"
+    		"email list => lists all accounts."
+    	when "show"
+    		"email show <account name> => shows information about an account."
+    	when "set"
+    		"email set <account name> <parameter> <value> => modifies account information. Valid  values of <parameter> are: username, password, server, port. #{Bold}Example:#{Bold} email set myaccount server pop.gmail.com"
+    	when "announce"
+    		"email announce <account name> <target> [<target2> <target3> ...] => start announcing an email account. <target> can either be a channel or a user."
+    	when "denounce"
+    		"email denounce <account name> [<target1> <target2> ...] => stop announcing an email account. If no targets are specified, all announcements of the email account will cease."
+    	when "announcements"
+    		"email announcements => lists all announcements currently active."	
+    	when "check"
+    		"email check <account name> => manually check for new mail on the specified account."
+    	else
+    		"email add|delete|list|show|set|announce|denounce|announcements|check"
+    	end
     end
     
     # adds an account to the @accounts hash
@@ -308,7 +336,7 @@ end
 
 plugin = EmailPlugin.new
 plugin.default_auth('*', false)
-plugin.map 'email add :account_name :username :password :server :port', :action => 'add_account', :defaults => {:port => 110, :announced => false}
+plugin.map 'email add :account_name :username :password :server [:port]', :action => 'add_account', :defaults => {:port => DEFAULT_PORT_POP3, :announced => false}
 plugin.map 'email delete :account_name', :action => 'delete_account'
 plugin.map 'email list', :action => 'list_accounts'
 plugin.map 'email show :account_name', :action => 'show_account'
