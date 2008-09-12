@@ -13,7 +13,6 @@
 #
 
 require 'net/pop'
-require 'openssl/ssl'
 require 'iconv'
 
 # Regular expression for matching RFC2047 encoded strings
@@ -65,11 +64,11 @@ class EmailPlugin < Plugin
         			begin 
         				
 		                fetch_mail(account_name, @bot.config['email.announcement_limit']) do |subject,from|
-		                    targets.each {|target| @bot.say(target, "MAIL: '#{subject}' from #{from}")}
+		                    targets.each {|target| @bot.say(target, "#{Bold}MAIL:#{Bold} '#{subject}' from #{from}")}
 		                end
 		                
 		            rescue AnnouncementLimitReached => report 
-		            	targets.each {|target| @bot.say(target, "There are #{report.unfetched_mails} new message(s) left in #{account_name} (announcement limit reached). Use 'email check #{account_name}' to see them all.")}
+		            	targets.each {|target| @bot.say(target, "There are #{Bold}#{report.unfetched_mails}#{Bold} new message(s) left in #{account_name} (announcement limit reached). Use #{Bold}email check #{account_name}#{Bold} to view them.")}
 		            end	
 	            end
 	        
@@ -82,23 +81,23 @@ class EmailPlugin < Plugin
     def help(plugin, topic="")
     	case topic
     	when "add"
-    		"email add <account name> <username> <password> <server> [<port>] => adds a new account. If <port> is not specified, the default port will be used (POP3: #{DEFAULT_PORT_POP3})."
+    		"#{Bold}email add <account name> <username> <password> <server> [<port>]#{Bold} => adds a new account. If <port> is not specified, the default port will be used (POP3: #{DEFAULT_PORT_POP3})."
     	when "delete"
-    		"email delete <account name> => deletes an account."
+    		"#{Bold}email delete <account name>#{Bold} => deletes an account."
     	when "list"
-    		"email list => lists all accounts."
+    		"#{Bold}email list#{Bold} => lists all accounts."
     	when "show"
-    		"email show <account name> => shows information about an account."
+    		"#{Bold}email show <account name>#{Bold} => shows information about an account."
     	when "set"
-    		"email set <account name> <parameter> <value> => modifies account information. Valid  values of <parameter> are: username, password, server, port. #{Bold}Example:#{Bold} email set myaccount server pop.gmail.com"
+    		"#{Bold}email set <account name> <parameter> <value>#{Bold} => modifies account information. Valid  values of <parameter> are: username, password, server, port. #{Bold}Example:#{Bold} email set myaccount server pop.gmail.com"
     	when "announce"
-    		"email announce <account name> <target> [<target2> <target3> ...] => start announcing an email account. <target> can either be a channel or a user."
+    		"#{Bold}email announce <account name> <target> [<target2> <target3> ...]#{Bold} => start announcing an email account. <target> can either be a channel or a user."
     	when "denounce"
-    		"email denounce <account name> [<target1> <target2> ...] => stop announcing an email account. If no targets are specified, all announcements of the email account will cease."
+    		"#{Bold}email denounce <account name> [<target1> <target2> ...]#{Bold} => stop announcing an email account. If no targets are specified, all announcements of the email account will cease."
     	when "announcements"
-    		"email announcements => lists all announcements currently active."	
+    		"#{Bold}email announcements#{Bold} => lists all announcements currently active."	
     	when "check"
-    		"email check <account name> => manually check for new mail on the specified account."
+    		"#{Bold}email check <account name>#{Bold} => manually check for new mail on the specified account."
     	else
     		"email add|delete|list|show|set|announce|denounce|announcements|check"
     	end
@@ -115,9 +114,9 @@ class EmailPlugin < Plugin
                 #:use_ssl => params[:use_ssl]
             }
             
-            m.reply("Account #{params[:account_name]} added.")
+            m.reply("Account #{Bold}#{params[:account_name]}#{Bold} added.")
         else
-            m.reply("Account #{params[:account_name]} already exists. Please delete it first or use 'account set #{params[:account_name]} <parameter> <value>' to modify it.")
+            m.reply("Account #{Bold}#{params[:account_name]}#{Bold} already exists. Please delete it first or use #{Bold}account set #{params[:account_name]} <parameter> <value>#{Bold} to modify it.")
             
         end
     end
@@ -130,7 +129,7 @@ class EmailPlugin < Plugin
             #also, delete all associated announcements
             @announcements.delete(params[:account_name])
             
-            m.reply("Account #{params[:account_name]} deleted.")
+            m.reply("Account #{Bold}#{params[:account_name]}#{Bold} deleted.")
         else
             m.reply("No account by that name.")
         end
@@ -144,7 +143,7 @@ class EmailPlugin < Plugin
             if (@accounts[params[:account_name]].has_key?(parameter))
                 @accounts[params[:account_name]][parameter] = params[:value]
                 
-                m.reply("Set #{params[:parameter]} of #{params[:account_name]} to #{params[:value]}.")
+                m.reply("Set #{Bold}#{params[:parameter]}#{Bold} of #{Bold}#{params[:account_name]}#{Bold} to #{Bold}#{params[:value]}#{Bold}.")
             else
                 m.reply("'#{params[:parameter]}' is not a valid parameter.")
             end
@@ -180,7 +179,7 @@ class EmailPlugin < Plugin
         end
         
         targets_commalist = params[:targets].join(", ")
-        m.reply("Now announcing #{params[:account_name]} to #{targets_commalist}.")
+        m.reply("Now announcing #{Bold}#{params[:account_name]}#{Bold} to #{Bold}#{targets_commalist}#{Bold}.")
     end
     
     # deletes entries from the @announcements hash
@@ -191,7 +190,7 @@ class EmailPlugin < Plugin
         		# if no targets are specified, remove all targets
         		@announcements.delete(params[:account_name])
         		
-        		m.reply("Mo longer announcing #{params[:account_name]} at all.")
+        		m.reply("No longer announcing #{Bold}#{params[:account_name]}#{Bold}.")
         	else
         		@announcements[params[:account_name]] = @announcements[params[:account_name]] - params[:targets]
             	
@@ -199,11 +198,11 @@ class EmailPlugin < Plugin
 	            @announcements.delete(params[:account_name]) if @announcements[params[:account_name]].empty?
 	            
 	            targets_commalist = params[:targets].join(", ")
-	            m.reply("No longer announcing #{params[:account_name]} to #{targets_commalist}.")
+	            m.reply("No longer announcing #{Bold}#{params[:account_name]}#{Bold} to #{Bold}#{targets_commalist}#{Bold}.")
         
 	        end
         else
-            m.reply("Account #{params[:account_name]} is not being announced.")
+            m.reply("Account #{Bold}#{params[:account_name]}#{Bold} is not being announced.")
         end
     end
     
@@ -213,7 +212,7 @@ class EmailPlugin < Plugin
         if @announcements.size > 0
             @announcements.each do |account_name, targets|
                 targets_commalist = targets.join(", ")
-                m.reply("Announcing #{account_name} to #{targets_commalist}")
+                m.reply("Announcing #{Bold}#{account_name}#{Bold} to #{Bold}#{targets_commalist}#{Bold}")
             end
         else
             m.reply("Not announcing any email accounts.")
@@ -227,7 +226,7 @@ class EmailPlugin < Plugin
                 m.reply "'#{subject}' from #{from}"
             end
         
-            m.reply("No new mail for account #{params[:account_name]}.") if new_mail.empty?
+            m.reply("No new mail for account #{Bold}#{params[:account_name]}#{Bold}.") if new_mail.empty?
      
         else
             m.reply("No account by that name.")
