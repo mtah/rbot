@@ -307,6 +307,7 @@ class AnnouncementLimitReached < RuntimeError
 end
 
 plugin = EmailPlugin.new
+plugin.default_auth('*', false)
 plugin.map 'email add :account_name :username :password :server :port', :action => 'add_account', :defaults => {:port => 110, :announced => false}
 plugin.map 'email delete :account_name', :action => 'delete_account'
 plugin.map 'email list', :action => 'list_accounts'
